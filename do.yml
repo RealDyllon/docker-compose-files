@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
+# RENAME THIS FILE TO: docker-compose.yml
+
+version: "3.6"
+services:
+  sloan:
+    container_name: "sloan"
+    image: "ghcr.io/realdyllon/sloan-bot:latest"
+    env_file: sloan.env
+
+  traefik:
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=postmaster@dyllon.io"
+      - "--certificatesresolvers.myresolver.acme.storage=./letsencrypt/acme.json"
+    container_name: "traefik"
+    image: "traefik:v2.9"
+    ports:
+      - "443:443/tcp"
+      - "80:80/tcp"
+      - "8080:8080/tcp"
+    volumes:
+      - "/root/containers/letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+  vaultwarden:
+    container_name: "vaultwarden"
+    expose:
+      - "3012/tcp"
+      - "80/tcp"
+    hostname: "db754b7d455f"
+    image: "vaultwarden/server:alpine"
+    ipc: "private"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.whoami.entrypoints: "websecure"
+      traefik.http.routers.whoami.rule: "Host(`vault.dyllon.io`)"
+      traefik.http.routers.whoami.tls.certresolver: "myresolver"
+    volumes:
+      - "/root/containers/vaultwarden:/data"
